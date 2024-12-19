@@ -1,55 +1,89 @@
-//Blogging App using Hooks
-import { type } from "@testing-library/user-event/dist/type";
-import { useState, useRef, useEffect, useReducer } from "react";
+//Blogging App with Firebase
+import { useState, useRef, useEffect } from "react";
 
-function blogsReducer(state, action){
-  switch(action.type){
-    case "ADD" : 
-        return [action.blog, ...state];
-    case "REMOVE" :
-        return state.filter((blog,index) => index !== action.index);
-    default : {
-        return [];
-    }        
-  }
-}
+//Import fireStore reference from frebaseInit file
+import { db } from "../firebaseInit";
+
+//Import all the required functions from fireStore
+import { collection, doc, getDocs, onSnapshot, setDoc, deleteDoc} from "firebase/firestore"; 
 
 export default function Blog(){
 
-    // const [title,setTitle] = useState("");
-    // const [content,setContent] = useState("");
     const [formData, setformData] = useState({title:"", content:""})
-   // const [blogs, setBlogs] =  useState([]); //We will reducers in place of useState
-   const [blogs, dispatch] = useReducer(blogsReducer, []);
+    const [blogs, setBlogs] =  useState([]);
+
     const titleRef = useRef(null);
 
-    useEffect(()=>{
-        titleRef.current.focus();
-    }, []);
+    useEffect(() => {
+        titleRef.current.focus()
+    },[]);
 
     useEffect(() => {
-        if(blogs.length && blogs[0].title){
-            document.title = blogs[0].title;
-        }else{
-            document.title = "No Blogs";
+        
+        /*********************************************************************** */
+        /** get all the documents from the fireStore using getDocs() */ 
+        /*********************************************************************** */
+       /* async function fetchData(){
+            const snapShot =await getDocs(collection(db, "blogs"));
+            console.log(snapShot);
+
+            const blogs = snapShot.docs.map((doc) => {
+                return{
+                    id: doc.id,
+                    ...doc.data()
+                }
+            })
+            console.log(blogs);
+            setBlogs(blogs); 
+
         }
-    }, [blogs])
 
-    function handleSubmit(e){
+        fetchData();
+        /*********************************************************************** */
+
+        // Real time update of blogs
+
+        const unsub = onSnapshot(collection(db,"blogs"), (snapShot) => {
+            const blogs = snapShot.docs.map((doc) => {
+                return{
+                    id: doc.id,
+                    ...doc.data()
+                }
+            })
+            console.log(blogs);
+            setBlogs(blogs); 
+        })
+    },[]);
+
+    async function handleSubmit(e){
         e.preventDefault();
-
-       // setBlogs([{title: formData.title,content:formData.content}, ...blogs]); //Commenting as using reducer so dispach will be used in place
-        dispatch({type: "ADD", blog : {title: formData.title,content:formData.content} })
-        setformData({title:"", content:""});
-        console.log(blogs);
         titleRef.current.focus();
+
+        // Commenting setBlogs() as realtime Updates will be recieved from the database
+        //setBlogs([{title: formData.title,content:formData.content}, ...blogs]);
+
+        /*********************************************************************** */
+        /** Add a new document with an auto generated id. */ 
+        /*********************************************************************** */
+
+        const docRef = doc(collection(db, "blogs"))
+            
+        await setDoc(docRef, {
+                title: formData.title,
+                content: formData.content,
+                createdOn: new Date()
+            });
+
+        /*********************************************************************** */
+        
+        setformData({title: "", content: ""});
     }
 
-    function removeBlog(i){
+    async function removeBlog(id){
 
-        //setBlogs( blogs.filter((blog,index)=> index !== i)); // Commenting as we will use reducer so need to use dispatch
-        dispatch({type : "REMOVE", index : i})
- 
+        //setBlogs( blogs.filter((blog,index)=> index !== i));// This was just removing from local state
+        const docRef = doc(db, "blogs", id)
+        await deleteDoc(docRef);
      }
 
     return(
@@ -59,11 +93,11 @@ export default function Blog(){
 
         {/* Form for to write the blog */}
             <form onSubmit={handleSubmit}>
-                <Row label="Title"> 
+                <Row label="Title">
                         <input className="input"
                                 placeholder="Enter the Title of the Blog here.."
+                                ref = {titleRef}
                                 value={formData.title}
-                                ref={titleRef}
                                 onChange = {(e) => setformData({title: e.target.value, content:formData.content})}
                         />
                 </Row >
@@ -71,8 +105,8 @@ export default function Blog(){
                 <Row label="Content">
                         <textarea className="input content"
                                 placeholder="Content of the Blog goes here.."
-                                value={formData.content}
                                 required
+                                value={formData.content}
                                 onChange = {(e) => setformData({title: formData.title,content: e.target.value})}
                         />
                 </Row >
@@ -87,14 +121,14 @@ export default function Blog(){
         {/* Section where submitted blogs will be displayed */}
         <h2> Blogs </h2>
         {blogs.map((blog,i) => (
-            <div className="blog">
+            <div className="blog" key={i}>
                 <h3>{blog.title}</h3>
                 <hr/>
                 <p>{blog.content}</p>
 
                 <div className="blog-btn">
                         <button onClick={() => {
-                            removeBlog(i)
+                              removeBlog(blog.id) 
                         }}
                         className="btn remove">
 
